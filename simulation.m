@@ -49,12 +49,14 @@ function simulation
     end
 
 
-    function locDensity = computeDensity(coords)
+    function locDensity = computeDensity(x, y)
+        
+        coords = [x, y];
         distMat = squareform(pdist(coords)); 
 
         % % WEIGHTED MEAN DIST
         % % Choose a bandwidth parameter h that defines the neighborhood size
-        % h = 8; 
+        % h = 20; 
         % 
         % % Compute weights that decay with distance (Gaussian kernel)
         % w = exp(-((distMat/h).^2));
@@ -65,14 +67,14 @@ function simulation
         % 
         % % Compute a weighted mean distance for each cell
         % weightedMeanDist = sum(distMat .* w, 2) ./ sum(w, 2);
-        % disp(weightedMeanDist)
+        % % disp(weightedMeanDist)
         % 
         % % Define local density as the inverse of the weighted mean distance
-        % locDensity = 1 ./ weightedMeanDist;
-        % % locDensity = exp(-((weightedMeanDist/h).^2));
-        % % disp(weightedMeanDist)
+        % % locDensity = 1 ./ weightedMeanDist;
+        % locDensity = exp(-(weightedMeanDist/h).^2);
+        % disp(locDensity)
 
-        % UNWEIGHTED MEAN DIST
+        % % UNWEIGHTED MEAN DIST
         % N = size(coords,1);
         % % sum distance from each row i to all columns j
         % sumDist = sum(distMat, 2);
@@ -86,18 +88,20 @@ function simulation
 
         % FIXED RADIUS NEIGHBORS
         r0 = 15;
-      
+
         % Create a logical matrix indicating which distances are <= r0
         neighborMask = distMat <= r0;
-        
+
         % Exclude self by setting the diagonal to false
         neighborMask(1:size(neighborMask,1)+1:end) = false;
-        
+
         % Count the number of neighbors for each coordinate
         neighborCounts = sum(neighborMask, 2);
-        
-        h = 6; 
-        locDensity = exp(-h./neighborCounts);
+
+        h = 5; 
+        locDensity = 1-exp(-neighborCounts./h);
+
+
         % disp(locDensity)
         % disp(neighborCounts)
         for i = 1:length(locDensity)
@@ -108,7 +112,7 @@ function simulation
     % Parameters
     numCells = 8;
     radius   = 100;
-    numSteps = 200;
+    numSteps = 250;
     
     % Allocate array to store positions (numCells x 2 x numSteps)
     % posHistory = zeros(numCells, 2, numSteps);
@@ -121,20 +125,21 @@ function simulation
     x = rDist .* cos(angles);
     y = rDist .* sin(angles);
     p = rand(numCells,1);
+    d = computeDensity(x, y);
  
     
     % Store initial positions
     % posHistory(:,1,1) = x;
     % posHistory(:,2,1) = y;
-    history{1} = [x, y, p];
+    history{1} = [x, y, p, d];
     
     % Run the simulation in a loop, but NOT animating yet
     for t = 2:numSteps
         
-        coords = [x, y];
-        locDensity = computeDensity(coords);
         
-        lambda = 0.1;
+        locDensity = computeDensity(x, y);
+        
+        lambda = 0.05;
 
         [dx, dy] = computeForce(x, y);
         dp = lambda*(1-locDensity);
@@ -158,9 +163,9 @@ function simulation
             newY = y(idx) + epsDist*sin(randAngle);
     
             % Append to x, y, p
-            x  = [x;  newX];
-            y  = [y;  newY];
-            p  = [p;  0];         % new cell starts with p=0
+            x = [x;  newX];
+            y = [y;  newY];
+            p = [p;  0];         % new cell starts with p=0
         end
         
         % Enforce circular boundary
@@ -172,10 +177,11 @@ function simulation
             y(outside)    = y(outside) .* scaleFactor;
         end
 
-        numCells = length(x);  % Update to include newly divided cells
+        d = computeDensity(x,y);
+        % numCells = length(x);  % Update to include newly divided cells
         % posHistory(1:numCells,1,t) = x;
         % posHistory(1:numCells,2,t) = y;
-        history{t} = [x, y, p];
+        history{t} = [x, y, p, d];
     end
     
     % Figure
@@ -252,7 +258,7 @@ function simulation
         data = history{t};
         xData = data(:,1);
         yData = data(:,2);
-        cData = data(:,3);
+        cData = data(:,4);
         set(scat, 'XData', xData, 'YData', yData, 'CData', cData);
         drawnow;
     end
